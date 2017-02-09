@@ -1,0 +1,4 @@
+-i https://pypi.tuna.tsinghua.edu.cn/simple/
+
+MySQL-python==1.2.3
+DBUtils==1.1
