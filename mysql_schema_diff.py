@@ -266,7 +266,7 @@ def convert_readable_value(v):
         return u'NULL'
 
     elif v == '':
-        return u'""'
+        return u'<空字符串>'
 
     else:
         return v
