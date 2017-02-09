@@ -44,7 +44,7 @@ python mysql_schema_diff.py <user>:<passwd>@<host>:<port>/<db> <user>:<passwd>@<
 
 * [差异表] tb_main_enterprise_applications
     * [差异列] id
-        COLUMN_DEFAULT --------------- 从基准数据库的`NULL`被改为目标数据库的`""`
+        COLUMN_DEFAULT --------------- 从基准数据库的`NULL`被改为目标数据库的`<空字符串>`
 
 * [差异表] tb_main_course_categories
     * [差异列] updateTimestamp
