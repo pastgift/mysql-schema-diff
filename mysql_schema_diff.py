@@ -171,24 +171,24 @@ def get_mysql_schema(db):
 
     return mysql_schemas
 
-def compare_schema(src_schema, dest_schema):
+def compare_schema(base_schema, target_schema):
     '''
     返回结构如下：
         {
             "<tableName>": {
                 "syntaxChanged": True|False,
 
-                "tableAdded"    : True|False,
-                "tableRemoved" : True|False,
+                "tableAdded"  : True|False,
+                "tableRemoved": True|False,
                 "changedColumns": {
                     "<columnName>": {
-                        "columnAdded"   : True|False,
-                        "columnRemoved" : True|False,
+                        "columnAdded"  : True|False,
+                        "columnRemoved": True|False,
 
                         "columnChanges": {
                             "<columnPorp>": {
-                                "src" : <value>,
-                                "dest": <value>,
+                                "base"  : <value>,
+                                "target": <value>,
                             }
                         }
                     }
@@ -198,9 +198,9 @@ def compare_schema(src_schema, dest_schema):
     '''
     diff_schemas = OrderedDict()
 
-    for table_name in list(set(src_schema.keys() + dest_schema.keys())):
-        src_table  = src_schema.get(table_name)
-        dest_table = dest_schema.get(table_name)
+    for table_name in list(set(base_schema.keys() + target_schema.keys())):
+        base_table  = base_schema.get(table_name)
+        target_table = target_schema.get(table_name)
 
         diff = {
             'tableAdded'    : False,
@@ -209,25 +209,25 @@ def compare_schema(src_schema, dest_schema):
             'changedColumns': OrderedDict(),
         }
 
-        if (src_table is None) and (dest_table is not None):
+        if (base_table is None) and (target_table is not None):
             # 表增加
             diff['tableAdded'] = True
             diff_schemas[table_name] = diff
 
-        elif (src_table is not None) and (dest_table is None):
+        elif (base_table is not None) and (target_table is None):
             # 表删除
             diff['tableRemoved'] = True
             diff_schemas[table_name] = diff
 
         else:
             # 继续对比建表语句
-            if src_table['syntax'] != dest_table['syntax']:
+            if base_table['syntax'] != target_table['syntax']:
                 diff['syntaxChanged'] = True
 
                 # 继续比较各列
-                for column_name in list(set(src_table['columns'].keys() + dest_table['columns'].keys())):
-                    src_column  = src_table['columns'].get(column_name)
-                    dest_column = dest_table['columns'].get(column_name)
+                for column_name in list(set(base_table['columns'].keys() + target_table['columns'].keys())):
+                    base_column  = base_table['columns'].get(column_name)
+                    target_column = target_table['columns'].get(column_name)
 
                     col_diff = {
                         'columnAdded'  : False,
@@ -235,12 +235,12 @@ def compare_schema(src_schema, dest_schema):
                         'columnChanges': OrderedDict(),
                     }
 
-                    if (src_column is None) and (dest_column is not None):
+                    if (base_column is None) and (target_column is not None):
                         # 列增加
                         col_diff['columnAdded'] = True
                         diff['changedColumns'][column_name] = col_diff
 
-                    elif (src_column is not None) and (dest_column is None):
+                    elif (base_column is not None) and (target_column is None):
                         # 列删除
                         col_diff['columnRemoved'] = True
                         diff['changedColumns'][column_name] = col_diff
@@ -248,10 +248,10 @@ def compare_schema(src_schema, dest_schema):
                     else:
                         # 继续比较各列属性
                         for p in COLUMN_PROPS:
-                            if src_column[p] != dest_column[p]:
+                            if base_column[p] != target_column[p]:
                                 col_diff['columnChanges'][p] = {
-                                    'src' : src_column[p],
-                                    'dest': dest_column[p],
+                                    'base'  : base_column[p],
+                                    'target': target_column[p],
                                 }
 
                         if col_diff['columnChanges']:
@@ -275,9 +275,9 @@ def print_schema_diff(schema_diff):
     for table_name, table_diff in schema_diff.items():
         print_line = u'\n'
 
-        if table_diff['tableAdded']:      print_line += COLOR_GREEN  + u'+ [新增表] '
-        elif table_diff['tableRemoved']:  print_line += COLOR_RED    + u'- [删除表] '
-        elif table_diff['syntaxChanged']: print_line += COLOR_YELLOW + u'* [修改表] '
+        if table_diff['tableAdded']:      print_line += COLOR_GREEN  + u'+ [多余表] '
+        elif table_diff['tableRemoved']:  print_line += COLOR_RED    + u'- [缺少表] '
+        elif table_diff['syntaxChanged']: print_line += COLOR_YELLOW + u'* [差异表] '
 
         print_line += table_name
         print print_line
@@ -287,9 +287,9 @@ def print_schema_diff(schema_diff):
             for column_name, column_diff in changed_columns.items():
                 print_line = u'\t'
 
-                if column_diff['columnAdded']:      print_line += COLOR_GREEN  + u'+ [新增列] '
-                elif column_diff['columnRemoved']:  print_line += COLOR_RED    + u'- [删除列] '
-                elif column_diff['columnChanges']:  print_line += COLOR_YELLOW + u'* [修改列] '
+                if column_diff['columnAdded']:      print_line += COLOR_GREEN  + u'+ [多余列] '
+                elif column_diff['columnRemoved']:  print_line += COLOR_RED    + u'- [缺少列] '
+                elif column_diff['columnChanges']:  print_line += COLOR_YELLOW + u'* [差异列] '
 
                 print_line += column_name
                 print print_line
@@ -297,37 +297,42 @@ def print_schema_diff(schema_diff):
                 column_changes = column_diff['columnChanges']
                 if column_changes:
                     for column_prop, diff_info in column_changes.items():
-                        src_value  = convert_readable_value(diff_info['src'])
-                        dest_value = convert_readable_value(diff_info['dest'])
+                        base_value  = convert_readable_value(diff_info['base'])
+                        target_value = convert_readable_value(diff_info['target'])
 
-                        print_line = u'\t\t{:-<30}{:->20} -> {}'.format(
+                        print_line = u'\t\t{:-<30} 从基准数据库的`{}`被改为目标数据库的`{}`'.format(
                                 u'{} '.format(column_prop),
-                                u' `{}`'.format(src_value),
-                                u'`{}`'.format(dest_value))
+                                base_value,
+                                target_value)
                         print print_line
 
 def main():
-    db_src_option  = get_mysql_option(sys.argv[1])
-    db_dest_option = get_mysql_option(sys.argv[2])
+    db_base_option  = get_mysql_option(sys.argv[1])
+    db_target_option = get_mysql_option(sys.argv[2])
 
-    db_src  = MySQLHelper(**db_src_option)
-    db_dest = MySQLHelper(**db_dest_option)
+    db_base  = MySQLHelper(**db_base_option)
+    db_target = MySQLHelper(**db_target_option)
 
-    if db_src_option['passwd']:
-        db_src_option['passwd'] = '***'
+    if db_base_option['passwd']:
+        db_base_option['passwd'] = '***'
 
-    if db_dest_option['passwd']:
-        db_dest_option['passwd'] = '***'
+    if db_target_option['passwd']:
+        db_target_option['passwd'] = '***'
 
-    print '源数据库  :', ', '.join(['{}={}'.format(k, v) for k, v in db_src_option.items()])
-    print '目标数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_dest_option.items()])
+    print '基准数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_base_option.items()])
+    print '目标数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_target_option.items()])
 
-    db_src_schema  = get_mysql_schema(db_src)
-    db_dest_schema = get_mysql_schema(db_dest)
+    db_base_schema  = get_mysql_schema(db_base)
+    db_target_schema = get_mysql_schema(db_target)
 
-    schema_diff = compare_schema(db_src_schema, db_dest_schema)
+    schema_diff = compare_schema(db_base_schema, db_target_schema)
 
-    print_schema_diff(schema_diff)
+    if schema_diff:
+        print '\n目标数据库相对于基准数据库存在以下差异：'
+        print_schema_diff(schema_diff)
+
+    else:
+        print '\n数据库结构完全一致'
 
 if __name__ == '__main__':
     main()
