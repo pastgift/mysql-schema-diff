@@ -42,12 +42,11 @@ COLUMN_PROPS = [
 def get_mysql_option(conn_str):
     conn_str = conn_str.replace('mysql://', '')
 
-    mysql_option = {
-        'host'  : None,
-        'user'  : None,
-        'passwd': None,
-        'db'    : None,
-    }
+    mysql_option = OrderedDict()
+    mysql_option['host']   = None
+    mysql_option['user']   = None
+    mysql_option['passwd'] = None
+    mysql_option['db']     = None
 
     auth_part = None
     url_part  = None
@@ -311,12 +310,17 @@ def main():
     db_src_option  = get_mysql_option(sys.argv[1])
     db_dest_option = get_mysql_option(sys.argv[2])
 
-    print 'Compare:'
-    print 'Src  DB:', db_src_option
-    print 'Dest DB:', db_dest_option
-
     db_src  = MySQLHelper(**db_src_option)
     db_dest = MySQLHelper(**db_dest_option)
+
+    if db_src_option['passwd']:
+        db_src_option['passwd'] = '***'
+
+    if db_dest_option['passwd']:
+        db_dest_option['passwd'] = '***'
+
+    print '源数据库  :', ', '.join(['{}={}'.format(k, v) for k, v in db_src_option.items()])
+    print '目标数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_dest_option.items()])
 
     db_src_schema  = get_mysql_schema(db_src)
     db_dest_schema = get_mysql_schema(db_dest)
