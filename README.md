@@ -1,20 +1,20 @@
 # MySQL 数据库结构对比工具
 
-# 安装依赖包
+## 安装依赖包
 
 ```sh
 pip install -f requirements.txt
 ```
 
-# 使用方式
+## 使用方式
 
 ```python
 python mysql_schema_diff.py <user>:<passwd>@<host>:<port>/<db> <user>:<passwd>@<host>:<port>/<db>
 ```
 
-# 对比结果示例
+## 对比结果示例
 
-## 结构一致时：
+### 结构一致时：
 
 ```
 基准数据库: host=<host>, user=<usern>, passwd=***, db=<db>
@@ -23,7 +23,7 @@ python mysql_schema_diff.py <user>:<passwd>@<host>:<port>/<db> <user>:<passwd>@<
 数据库结构完全一致
 ```
 
-## 存在差异时：
+### 存在差异时：
 
 ```
 基准数据库: host=<host>, user=<usern>, passwd=***, db=<db>
