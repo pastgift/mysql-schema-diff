@@ -3,7 +3,7 @@
 ## 安装依赖包
 
 ```sh
-pip install -f requirements.txt
+pip install -r requirements.txt
 ```
 
 ## 使用方式
