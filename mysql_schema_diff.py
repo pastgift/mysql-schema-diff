@@ -280,7 +280,7 @@ def print_schema_diff(schema_diff):
         elif table_diff['syntaxChanged']: print_line += COLOR_YELLOW + u'* [差异表] '
 
         print_line += table_name
-        print print_line
+        print print_line.encode('utf8')
 
         changed_columns = table_diff['changedColumns']
         if changed_columns:
@@ -292,7 +292,7 @@ def print_schema_diff(schema_diff):
                 elif column_diff['columnChanges']:  print_line += COLOR_YELLOW + u'* [差异列] '
 
                 print_line += column_name
-                print print_line
+                print print_line.encode('utf8')
 
                 column_changes = column_diff['columnChanges']
                 if column_changes:
@@ -304,7 +304,7 @@ def print_schema_diff(schema_diff):
                                 u'{} '.format(column_prop),
                                 base_value,
                                 target_value)
-                        print print_line
+                        print print_line.encode('utf8')
 
 def main():
     db_base_option  = get_mysql_option(sys.argv[1])
