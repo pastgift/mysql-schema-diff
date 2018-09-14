@@ -149,7 +149,7 @@ def get_mysql_schema(db):
     # 获取所有建表语句
     for table_name, _ in mysql_schemas.items():
         sql = '''
-            SHOW CREATE TABLE ??
+            SHOW CREATE TABLE `??`
         '''
         sql_params = [table_name]
         db_ret = db.query(sql, sql_params)
@@ -271,15 +271,27 @@ def convert_readable_value(v):
     else:
         return v
 
-def print_schema_diff(schema_diff):
+def print_schema_diff(schema_diff, no_color=False):
     for table_name, table_diff in schema_diff.items():
         print_line = u'\n'
 
-        if table_diff['tableAdded']:      print_line += COLOR_GREEN  + u'+ [多余表] '
-        elif table_diff['tableRemoved']:  print_line += COLOR_RED    + u'- [缺少表] '
-        elif table_diff['syntaxChanged']: print_line += COLOR_YELLOW + u'* [差异表] '
+        line_label = ''
+        if table_diff['tableAdded']:
+            line_label = u'+ [多余表] '
+            if no_color is False:
+                line_label = COLOR_GREEN  + line_label + COLOR_RESET
 
-        print_line += table_name
+        elif table_diff['tableRemoved']:
+            line_label = u'- [缺少表] '
+            if no_color is False:
+                line_label = COLOR_RED  + line_label + COLOR_RESET
+
+        elif table_diff['syntaxChanged']:
+            line_label = u'* [差异表] '
+            if no_color is False:
+                line_label = COLOR_YELLOW  + line_label + COLOR_RESET
+
+        print_line += line_label + table_name
         print print_line.encode('utf8')
 
         changed_columns = table_diff['changedColumns']
@@ -287,11 +299,23 @@ def print_schema_diff(schema_diff):
             for column_name, column_diff in changed_columns.items():
                 print_line = u'\t'
 
-                if column_diff['columnAdded']:      print_line += COLOR_GREEN  + u'+ [多余列] '
-                elif column_diff['columnRemoved']:  print_line += COLOR_RED    + u'- [缺少列] '
-                elif column_diff['columnChanges']:  print_line += COLOR_YELLOW + u'* [差异列] '
+                line_label = ''
+                if column_diff['columnAdded']:
+                    line_label = u'+ [多余列] '
+                    if no_color is False:
+                        line_label = COLOR_GREEN  + line_label + COLOR_RESET
 
-                print_line += column_name
+                elif column_diff['columnRemoved']:
+                    line_label = u'- [缺少列] '
+                    if no_color is False:
+                        line_label = COLOR_RED  + line_label + COLOR_RESET
+
+                elif column_diff['columnChanges']:
+                    line_label = u'* [差异列] '
+                    if no_color is False:
+                        line_label = COLOR_YELLOW  + line_label + COLOR_RESET
+
+                print_line += line_label + table_name
                 print print_line.encode('utf8')
 
                 column_changes = column_diff['columnChanges']
@@ -309,6 +333,10 @@ def print_schema_diff(schema_diff):
 def main():
     db_base_option  = get_mysql_option(sys.argv[1])
     db_target_option = get_mysql_option(sys.argv[2])
+
+    no_color_option = False
+    if len(sys.argv) > 3 and sys.argv[3] == '--no-color':
+        no_color_option = True
 
     db_base  = MySQLHelper(**db_base_option)
     db_target = MySQLHelper(**db_target_option)
@@ -329,7 +357,7 @@ def main():
 
     if schema_diff:
         print '\n目标数据库相对于基准数据库存在以下差异：'
-        print_schema_diff(schema_diff)
+        print_schema_diff(schema_diff, no_color_option)
 
     else:
         print '\n数据库结构完全一致'
