@@ -315,7 +315,7 @@ def print_schema_diff(schema_diff, no_color=False):
                     if no_color is False:
                         line_label = COLOR_YELLOW  + line_label + COLOR_RESET
 
-                print_line += line_label + table_name
+                print_line += line_label + column_name
                 print print_line.encode('utf8')
 
                 column_changes = column_diff['columnChanges']
