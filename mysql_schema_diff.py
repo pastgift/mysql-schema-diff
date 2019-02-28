@@ -162,7 +162,7 @@ def get_mysql_schema(db):
         elif 'Create View' in db_ret[0]:
             # 视图
             syntax = db_ret[0]['Create View']
-            syntax = re.sub(' ALGORITHM=UNDEFINED DEFINER=`[a-zA-Z0-9]+`@`%` SQL SECURITY DEFINER', '', syntax)
+            syntax = re.sub(' DEFINER=`[-\w]+`', '', syntax)
 
         # 去除数据库名，避免影响对比
         syntax = syntax.replace(db.option['db'], '<thisDB>')
