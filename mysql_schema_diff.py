@@ -360,7 +360,7 @@ def main():
         print_schema_diff(schema_diff, no_color_option)
 
     else:
-        print '\n数据库结构完全一致'
+        print COLOR_GREEN + '\n数据库结构完全一致' + COLOR_RESET
 
 if __name__ == '__main__':
     main()
