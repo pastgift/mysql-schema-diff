@@ -165,7 +165,7 @@ def get_mysql_schema(db):
             syntax = re.sub(' DEFINER=`[-\w]+`', '', syntax)
 
         # 去除数据库名，避免影响对比
-        syntax = syntax.replace(db.option['db'], '<thisDB>')
+        syntax = syntax.replace('`{}`'.format(db.option['db']), '`<DB>`')
 
         mysql_schemas[table_name]['syntax'] = syntax
 
