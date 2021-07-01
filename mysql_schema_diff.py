@@ -158,6 +158,7 @@ def get_mysql_schema(db):
             # 表
             syntax = db_ret[0]['Create Table']
             syntax = re.sub(' AUTO_INCREMENT=\d+', '', syntax)
+            syntax = re.sub(' ROW_FORMAT=DYNAMIC', '', syntax)
 
         elif 'Create View' in db_ret[0]:
             # 视图
