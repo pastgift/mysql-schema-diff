@@ -1,5 +1,7 @@
 # MySQL 数据库结构对比工具
 
+2022-08-13 改为支持 Python 3.x
+
 ## 安装依赖包
 
 ```sh
@@ -17,8 +19,8 @@ python mysql_schema_diff.py <user>:<passwd>@<host>:<port>/<db> <user>:<passwd>@<
 ### 结构一致时：
 
 ```
-基准数据库: host=<host>, user=<user>, passwd=***, db=<db>
-目标数据库: host=<host>, user=<user>, passwd=***, db=<db>
+基准数据库：host=<host>, user=<user>, passwd=***, db=<db>
+目标数据库：host=<host>, user=<user>, passwd=***, db=<db>
 
 数据库结构完全一致
 ```
@@ -26,8 +28,8 @@ python mysql_schema_diff.py <user>:<passwd>@<host>:<port>/<db> <user>:<passwd>@<
 ### 存在差异时：
 
 ```
-基准数据库: host=<host>, user=<user>, passwd=***, db=<db>
-目标数据库: host=<host>, user=<user>, passwd=***, db=<db>
+基准数据库：host=<host>, user=<user>, passwd=***, db=<db>
+目标数据库：host=<host>, user=<user>, passwd=***, db=<db>
 
 目标数据库相对于基准数据库存在以下差异：
 
