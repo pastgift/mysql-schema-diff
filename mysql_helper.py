@@ -1,100 +1,163 @@
 # -*- coding: utf-8 -*-
 
-import datetime
+# Builtin Modules
+import re
+import traceback
 
-import MySQLdb
-import MySQLdb.converters as converters
-from MySQLdb.cursors import DictCursor
+# 3rd-party Modules
+import six
+import pymysql
+from pymysql.cursors import DictCursor
 from DBUtils.PooledDB import PooledDB
 
-conv = converters.conversions.copy()
-conv[MySQLdb.FIELD_TYPE.DATE] = str
-conv[MySQLdb.FIELD_TYPE.DATETIME] = str
-conv[MySQLdb.FIELD_TYPE.TIMESTAMP] = str
+SQL_PARAM_ESCAPE_MAP = {
+  '\0'  : '\\0',
+  '\b'  : '\\b',
+  '\t'  : '\\t',
+  '\n'  : '\\n',
+  '\r'  : '\\r',
+  '\x1a': '\\Z',
+  '"'   : '\\"',
+  '\''  : '\\\'',
+  '\\'  : '\\\\',
+}
 
-def mysql_escape_string(s):
-    if isinstance(s, str):
-        return MySQLdb.escape_string(s)
-    elif isinstance(s, unicode):
-        return MySQLdb.escape_string(s.encode('utf8'))
-    else:
+class HexStr(str):
+    pass
+
+def escape_sql_param(s):
+    if s is None:
+        return 'NULL'
+
+    elif s in (True, False):
+        s = str(s)
+        s = s.upper()
+        return s
+
+    elif isinstance(s, six.string_types):
+        is_hex_str = isinstance(s, HexStr)
+
+        s = six.ensure_str(s)
+        s = ''.join(SQL_PARAM_ESCAPE_MAP.get(c, c) for c in list(s))
+        s = "'{}'".format(six.ensure_str(s))
+        if is_hex_str:
+            s = 'X' + s
+        return s
+
+    elif isinstance(s, (six.integer_types, float)):
         return str(s)
 
-def sql_params_replace(sql, sql_params):
+    else:
+        s = str(s)
+        s = "'{}'".format(s)
+        return s
+
+def format_sql(sql, sql_params=None, pretty=False):
+    # Inspired by https://github.com/mysqljs/sqlstring/blob/master/lib/SqlString.js
     if not sql_params:
         return sql
-    for p in sql_params:
-        if '?' in sql:
-            if sql[sql.index('?') + 1] == '?':
-                # 存在参数占位符，且为不转义占位符
-                sql = sql.replace('??', str(p), 1)
+
+    if not isinstance(sql_params, (list, tuple)):
+        sql_params = [sql_params]
+
+    result          = ''
+    placeholder_re  = re.compile('\?+', re.M)
+    chunk_index     = 0
+    sql_param_index = 0
+
+    for m in re.finditer(placeholder_re, sql):
+        if sql_param_index >= len(sql_params):
+            break
+
+        placeholder = m.group()
+        if len(placeholder) > 2:
+            continue
+
+        sql_param = sql_params[sql_param_index]
+
+        escaped_sql_param = str(sql_param)
+        if placeholder == '?':
+            if isinstance(sql_param, dict):
+                # Dict -> field = 'Value', ...
+                expressions = []
+                for k, v in sql_param.items():
+                    if v is None:
+                        expressions.append('{} = NULL'.format(k))
+
+                    else:
+                        expressions.append("{} = {}".format(k, escape_sql_param(v)))
+
+                escaped_sql_param = (',\n  ' if pretty else ', ').join(expressions)
+
+            elif isinstance(sql_param, (tuple, list, set)):
+                # Tuple, List -> 'value1', 'value2', ...
+                expressions = []
+                for x in sql_param:
+                    if isinstance(x, (tuple, list, set)):
+                        values = [escape_sql_param(v) for v in x]
+                        expressions.append('({})'.format(', '.join(values)))
+
+                    else:
+                        expressions.append(escape_sql_param(x))
+
+                escaped_sql_param = (',\n  ' if pretty else ', ').join(expressions)
 
             else:
-                # 存在参数占位符，且为转义占位符
-                if p is None:
-                    # None，强制转换为 NULL
-                    sql = sql.replace('?', 'NULL', 1)
+                # Other -> 'value'
+                escaped_sql_param = escape_sql_param(sql_param)
 
-                elif isinstance(p, dict):
-                    # 字典类型，转换为 a = '1', b = '2' ...
-                    expressions = []
-                    for k, v in p.items():
-                        if v is None:
-                            expressions.append("{} = NULL".format(k))
-                        elif isinstance(v, (int, long, float)):
-                            expressions.append("{} = {}".format(k, v))
-                        else:
-                            expressions.append("{} = '{}'".format(k, mysql_escape_string(v)))
-                    sql_part = ', '.join(expressions)
-                    sql = sql.replace('?', sql_part, 1)
+        start_index, end_index = m.span()
+        result += sql[chunk_index:start_index] + escaped_sql_param
+        chunk_index = end_index
+        sql_param_index += 1
 
-                elif isinstance(p, list):
-                    # 列表类型，转换为 1, 2, 3 ...
-                    expressions = []
-                    for x in p:
-                        if x is None:
-                            expressions.append('NULL')
-                        elif isinstance(x, (int, long, float)):
-                            expressions.append(x)
-                        else:
-                            expressions.append("'{}'".format(mysql_escape_string(x)))
+    if chunk_index == 0:
+        return sql
 
-                    sql_part = ', '.join(expressions)
-                    sql = sql.replace('?', sql_part, 1)
+    if chunk_index < len(sql):
+        return result + sql[chunk_index:]
 
-                else:
-                    # 其他，直接转换为字符串
-                    sql = sql.replace('?', "'{}'".format(mysql_escape_string(str(p))), 1)
+    return result.strip()
 
-    return sql
+def get_config(c):
+    _charset = c.get('charset') or 'utf8mb4'
 
-def prepare_py_str(db_result):
-    for row in db_result:
-        for (k, v) in row.items():
-            if isinstance(v, datetime.datetime):
-                row[k] = str(v)
+    config = {
+        'host'    : c.get('host') or '127.0.0.1',
+        'port'    : c.get('port') or 3306,
+        'user'    : c.get('user'),
+        'password': c.get('passwd'),
+        'database': c.get('db'),
 
-            elif isinstance(v, str):
-                return unicode(v.decode('utf8'))
-
-    return db_result
+        'cursorclass'   : DictCursor,
+        'charset'       : _charset,
+        'init_command'  : 'SET NAMES "{0}"'.format(_charset),
+        'maxconnections': 2,
+    }
+    return config
 
 class MySQLHelper(object):
-    def __init__(self, host=None, port=3306, user=None, passwd=None, db=None, charset='utf8', maxconnections=5):
-        self.option = {
-            'host'          : host,
-            'port'          : int(port),
-            'user'          : user,
-            'passwd'        : passwd,
-            'db'            : db,
-            'maxconnections': int(maxconnections),
-            'charset'       : charset,
-            'cursorclass'   : DictCursor,
-        }
-        self.mysql_pool = PooledDB(MySQLdb, **self.option)
+    def __init__(self, config, *args, **kwargs):
+        self.skip_log = True
+
+        self.config = config
+        self.client = PooledDB(pymysql, **get_config(config))
+
+    def check(self):
+        try:
+            self.query('SELECT 1')
+
+        except Exception as e:
+            for line in traceback.format_exc().splitlines():
+                print(line)
+
+            raise Exception(str(e))
 
     def start_trans(self):
-        conn = self.mysql_pool.connection()
+        if not self.skip_log:
+            print('[MYSQL] Trans START')
+
+        conn = self.client.connection()
         cur  = conn.cursor()
 
         trans_conn = {
@@ -105,51 +168,107 @@ class MySQLHelper(object):
         return trans_conn
 
     def commit(self, trans_conn):
-        conn = trans_conn['conn']
-        cur  = trans_conn['cur']
+        if not trans_conn:
+            return
+
+        if not self.skip_log:
+            print('[MYSQL] Trans COMMIT')
+
+        conn = trans_conn.get('conn')
+        cur  = trans_conn.get('cur')
 
         conn.commit()
+
         cur.close()
         conn.close()
 
     def rollback(self, trans_conn):
-        conn = trans_conn['conn']
-        cur  = trans_conn['cur']
+        if not trans_conn:
+            return
+
+        if not self.skip_log:
+            print('[MYSQL] Trans ROLLBACK')
+
+        conn = trans_conn.get('conn')
+        cur  = trans_conn.get('cur')
 
         conn.rollback()
+
         cur.close()
         conn.close()
 
-    def trans_query(self, trans_conn, sql, sql_params=None):
-        sql = sql_params_replace(sql, sql_params)
+    def _trans_execute(self, trans_conn, sql, sql_params=None):
+        formatted_sql = format_sql(sql, sql_params)
+
+        if not self.skip_log:
+            print('[MYSQL] Trans Query `{}`'.format(re.sub('\s+', ' ', formatted_sql, flags=re.M)))
+
+        if not trans_conn:
+            raise Exception('Transaction not started')
 
         conn = trans_conn['conn']
         cur  = trans_conn['cur']
 
-        db_result = None
+        count  = cur.execute(formatted_sql)
+        db_res = cur.fetchall()
 
-        cur.execute(sql)
+        return list(db_res), count
 
-        db_result = cur.fetchall()
-        db_result = prepare_py_str(db_result)
+    def _execute(self, sql, sql_params=None):
+        formatted_sql = format_sql(sql, sql_params)
 
-        return db_result
+        if not self.skip_log:
+            print('[MYSQL] Query `{}`'.format(re.sub('\s+', ' ', formatted_sql, flags=re.M)))
+
+        conn = None
+        cur  = None
+
+        try:
+            conn = self.client.connection()
+            cur  = conn.cursor()
+
+            count  = cur.execute(formatted_sql)
+            db_res = cur.fetchall()
+
+        except Exception as e:
+            for line in traceback.format_exc().splitlines():
+                print(line)
+
+            if conn:
+                conn.rollback()
+
+            raise
+
+        else:
+            conn.commit()
+
+            return list(db_res), count
+
+        finally:
+            if cur:
+                cur.close()
+
+            if conn:
+                conn.close()
+
+    def trans_query(self, trans_conn, sql, sql_params=None):
+        result, count = self._trans_execute(trans_conn, sql, sql_params)
+        return result
+
+    def trans_non_query(self, trans_conn, sql, sql_params=None):
+        result, count = self._trans_execute(trans_conn, sql, sql_params)
+        return count
 
     def query(self, sql, sql_params=None):
-        sql = sql_params_replace(sql, sql_params)
+        result, count = self._execute(sql, sql_params)
+        return result
 
-        db_result = None
+    def non_query(self, sql, sql_params=None):
+        result, count = self._execute(sql, sql_params)
+        return count
 
-        conn = self.mysql_pool.connection()
-        cur  = conn.cursor()
-
-        cur.execute(sql)
-
-        db_result = cur.fetchall()
-        db_result = prepare_py_str(db_result)
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return db_result
+    def dump_for_json(self, val):
+        '''
+        Dump JSON to string
+        '''
+        return toolkit.json_dumps(val)

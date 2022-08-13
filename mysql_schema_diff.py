@@ -124,7 +124,7 @@ def get_mysql_schema(db):
             TABLE_NAME,
             ORDINAL_POSITION
         '''
-    sql_params = [db.option['db']]
+    sql_params = [db.config['db']]
     db_ret = db.query(sql, sql_params)
     for r in db_ret:
         table_name  = r['TABLE_NAME']
@@ -166,7 +166,7 @@ def get_mysql_schema(db):
             syntax = re.sub(' DEFINER=`[-\w]+`', '', syntax)
 
         # 去除数据库名，避免影响对比
-        syntax = syntax.replace('`{}`'.format(db.option['db']), '`<DB>`')
+        syntax = syntax.replace('`{}`'.format(db.config['db']), '`<DB>`')
 
         mysql_schemas[table_name]['syntax'] = syntax
 
@@ -199,7 +199,7 @@ def compare_schema(base_schema, target_schema):
     '''
     diff_schemas = OrderedDict()
 
-    for table_name in list(set(base_schema.keys() + target_schema.keys())):
+    for table_name in list(set(list(base_schema.keys()) + list(target_schema.keys()))):
         base_table  = base_schema.get(table_name)
         target_table = target_schema.get(table_name)
 
@@ -264,60 +264,60 @@ def compare_schema(base_schema, target_schema):
 
 def convert_readable_value(v):
     if v is None:
-        return u'NULL'
+        return 'NULL'
 
     elif v == '':
-        return u'<空字符串>'
+        return '<空字符串>'
 
     else:
         return v
 
 def print_schema_diff(schema_diff, no_color=False):
     for table_name, table_diff in schema_diff.items():
-        print_line = u'\n'
+        print_line = '\n'
 
         line_label = ''
         if table_diff['tableAdded']:
-            line_label = u'+ [多余表] '
+            line_label = '+ [多余表] '
             if no_color is False:
                 line_label = COLOR_GREEN  + line_label + COLOR_RESET
 
         elif table_diff['tableRemoved']:
-            line_label = u'- [缺少表] '
+            line_label = '- [缺少表] '
             if no_color is False:
                 line_label = COLOR_RED  + line_label + COLOR_RESET
 
         elif table_diff['syntaxChanged']:
-            line_label = u'* [差异表] '
+            line_label = '* [差异表] '
             if no_color is False:
                 line_label = COLOR_YELLOW  + line_label + COLOR_RESET
 
         print_line += line_label + table_name
-        print print_line.encode('utf8')
+        print(print_line)
 
         changed_columns = table_diff['changedColumns']
         if changed_columns:
             for column_name, column_diff in changed_columns.items():
-                print_line = u'\t'
+                print_line = '\t'
 
                 line_label = ''
                 if column_diff['columnAdded']:
-                    line_label = u'+ [多余列] '
+                    line_label = '+ [多余列] '
                     if no_color is False:
                         line_label = COLOR_GREEN  + line_label + COLOR_RESET
 
                 elif column_diff['columnRemoved']:
-                    line_label = u'- [缺少列] '
+                    line_label = '- [缺少列] '
                     if no_color is False:
                         line_label = COLOR_RED  + line_label + COLOR_RESET
 
                 elif column_diff['columnChanges']:
-                    line_label = u'* [差异列] '
+                    line_label = '* [差异列] '
                     if no_color is False:
                         line_label = COLOR_YELLOW  + line_label + COLOR_RESET
 
                 print_line += line_label + column_name
-                print print_line.encode('utf8')
+                print(print_line)
 
                 column_changes = column_diff['columnChanges']
                 if column_changes:
@@ -325,11 +325,11 @@ def print_schema_diff(schema_diff, no_color=False):
                         base_value  = convert_readable_value(diff_info['base'])
                         target_value = convert_readable_value(diff_info['target'])
 
-                        print_line = u'\t\t{:-<30} 从基准数据库的`{}`被改为目标数据库的`{}`'.format(
-                                u'{} '.format(column_prop),
+                        print_line = '\t\t{:-<30} 从基准数据库的`{}`被改为目标数据库的`{}`'.format(
+                                '{} '.format(column_prop),
                                 base_value,
                                 target_value)
-                        print print_line.encode('utf8')
+                        print(print_line)
 
 def main():
     db_base_option  = get_mysql_option(sys.argv[1])
@@ -339,8 +339,8 @@ def main():
     if len(sys.argv) > 3 and sys.argv[3] == '--no-color':
         no_color_option = True
 
-    db_base  = MySQLHelper(**db_base_option)
-    db_target = MySQLHelper(**db_target_option)
+    db_base  = MySQLHelper(db_base_option)
+    db_target = MySQLHelper(db_target_option)
 
     if db_base_option['passwd']:
         db_base_option['passwd'] = '***'
@@ -348,8 +348,8 @@ def main():
     if db_target_option['passwd']:
         db_target_option['passwd'] = '***'
 
-    print '基准数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_base_option.items()])
-    print '目标数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_target_option.items()])
+    print('基准数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_base_option.items()]))
+    print('目标数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_target_option.items()]))
 
     db_base_schema  = get_mysql_schema(db_base)
     db_target_schema = get_mysql_schema(db_target)
@@ -357,11 +357,11 @@ def main():
     schema_diff = compare_schema(db_base_schema, db_target_schema)
 
     if schema_diff:
-        print '\n目标数据库相对于基准数据库存在以下差异：'
+        print('\n目标数据库相对于基准数据库存在以下差异：')
         print_schema_diff(schema_diff, no_color_option)
 
     else:
-        print COLOR_GREEN + '\n数据库结构完全一致' + COLOR_RESET
+        print(COLOR_GREEN + '\n数据库结构完全一致' + COLOR_RESET)
 
 if __name__ == '__main__':
     main()
