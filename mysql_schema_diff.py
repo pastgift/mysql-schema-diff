@@ -226,7 +226,7 @@ def compare_schema(base_schema, target_schema):
                 diff['syntaxChanged'] = True
 
                 # 继续比较各列
-                for column_name in list(set(base_table['columns'].keys() + target_table['columns'].keys())):
+                for column_name in list(set(base_table['columns'].keys()) | set(target_table['columns'].keys())):
                     base_column  = base_table['columns'].get(column_name)
                     target_column = target_table['columns'].get(column_name)
 
