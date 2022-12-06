@@ -43,10 +43,10 @@ def get_mysql_option(conn_str):
     conn_str = conn_str.replace('mysql://', '')
 
     mysql_option = OrderedDict()
-    mysql_option['host']   = None
-    mysql_option['user']   = None
-    mysql_option['passwd'] = None
-    mysql_option['db']     = None
+    mysql_option['host']     = None
+    mysql_option['user']     = None
+    mysql_option['password'] = None
+    mysql_option['database'] = None
 
     auth_part = None
     url_part  = None
@@ -58,13 +58,13 @@ def get_mysql_option(conn_str):
 
     if auth_part:
         if ':' in auth_part:
-            mysql_option['user'], mysql_option['passwd'] = auth_part.split(':')
+            mysql_option['user'], mysql_option['password'] = auth_part.split(':')
         else:
             mysql_option['user'] = auth_part
 
     if url_part:
         if '/' in url_part:
-            host_part, mysql_option['db'] = url_part.split('/')
+            host_part, mysql_option['database'] = url_part.split('/')
 
             if ':' in host_part:
                 mysql_option['host'], mysql_option['port'] = host_part.split(':')
@@ -124,7 +124,7 @@ def get_mysql_schema(db):
             TABLE_NAME,
             ORDINAL_POSITION
         '''
-    sql_params = [db.config['db']]
+    sql_params = [db.config['database']]
     db_ret = db.query(sql, sql_params)
     for r in db_ret:
         table_name  = r['TABLE_NAME']
@@ -166,7 +166,7 @@ def get_mysql_schema(db):
             syntax = re.sub(' DEFINER=`[-\w]+`', '', syntax)
 
         # 去除数据库名，避免影响对比
-        syntax = syntax.replace('`{}`'.format(db.config['db']), '`<DB>`')
+        syntax = syntax.replace('`{}`'.format(db.config['database']), '`<DB>`')
 
         mysql_schemas[table_name]['syntax'] = syntax
 
@@ -342,11 +342,11 @@ def main():
     db_base  = MySQLHelper(db_base_option)
     db_target = MySQLHelper(db_target_option)
 
-    if db_base_option['passwd']:
-        db_base_option['passwd'] = '***'
+    if db_base_option['password']:
+        db_base_option['password'] = '***'
 
-    if db_target_option['passwd']:
-        db_target_option['passwd'] = '***'
+    if db_target_option['password']:
+        db_target_option['password'] = '***'
 
     print('基准数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_base_option.items()]))
     print('目标数据库:', ', '.join(['{}={}'.format(k, v) for k, v in db_target_option.items()]))

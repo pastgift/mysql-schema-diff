@@ -124,10 +124,10 @@ def get_config(c):
 
     config = {
         'host'    : c.get('host') or '127.0.0.1',
-        'port'    : c.get('port') or 3306,
+        'port'    : int(c.get('port')) or 3306,
         'user'    : c.get('user'),
-        'password': c.get('passwd'),
-        'database': c.get('db'),
+        'password': c.get('password'),
+        'database': c.get('database'),
 
         'cursorclass'   : DictCursor,
         'charset'       : _charset,
