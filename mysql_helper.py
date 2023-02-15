@@ -124,7 +124,7 @@ def get_config(c):
 
     config = {
         'host'    : c.get('host') or '127.0.0.1',
-        'port'    : int(c.get('port')) or 3306,
+        'port'    : int(c.get('port') or 3306),
         'user'    : c.get('user'),
         'password': c.get('password'),
         'database': c.get('database'),
