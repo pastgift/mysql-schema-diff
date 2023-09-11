@@ -357,11 +357,11 @@ def main():
     schema_diff = compare_schema(db_base_schema, db_target_schema)
 
     if schema_diff:
-        print('\n目标数据库相对于基准数据库存在以下差异：')
+        print(COLOR_YELLOW + '-> 目标数据库相对于基准数据库存在以下差异：' + COLOR_RESET)
         print_schema_diff(schema_diff, no_color_option)
 
     else:
-        print(COLOR_GREEN + '\n数据库结构完全一致' + COLOR_RESET)
+        print(COLOR_GREEN + '-> 数据库结构完全一致' + COLOR_RESET)
 
 if __name__ == '__main__':
     main()
