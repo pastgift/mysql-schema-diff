@@ -8,7 +8,7 @@ import traceback
 import six
 import pymysql
 from pymysql.cursors import DictCursor
-from DBUtils.PooledDB import PooledDB
+from dbutils.pooled_db import PooledDB
 
 SQL_PARAM_ESCAPE_MAP = {
   '\0'  : '\\0',
