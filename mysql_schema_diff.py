@@ -5,7 +5,7 @@ import json
 import re
 
 from collections import OrderedDict
-from mysql_helper import MySQLHelper
+from mysql_helper import MySQLHelper, escape_sql_param
 
 COLOR_RED    = '\033[1;31m'
 COLOR_GREEN  = '\033[1;32m'
@@ -37,6 +37,10 @@ COLUMN_PROPS = [
     'COLUMN_KEY',
     'EXTRA',
     'COLUMN_COMMENT',
+]
+
+COLUMN_SAME_PROP_VALUES = [
+    ( "'NULL'", None ),
 ]
 
 def get_mysql_option(conn_str):
@@ -248,12 +252,33 @@ def compare_schema(base_schema, target_schema):
 
                     else:
                         # 继续比较各列属性
-                        for p in COLUMN_PROPS:
-                            if base_column[p] != target_column[p]:
-                                col_diff['columnChanges'][p] = {
-                                    'base'  : base_column[p],
-                                    'target': target_column[p],
-                                }
+                        for prop in COLUMN_PROPS:
+                            base_prop   = base_column[prop]
+                            target_prop = target_column[prop]
+
+                            # 不同版本兼容
+                            if prop == 'COLUMN_TYPE':
+                                base_prop   = re.sub(r'int\(\d+\)', 'int', base_prop)
+                                target_prop = re.sub(r'int\(\d+\)', 'int', target_prop)
+
+                            elif prop == 'COLUMN_DEFAULT':
+                                if base_prop and not base_prop.startswith("'"):
+                                    base_prop = escape_sql_param(base_prop)
+                                if target_prop and not target_prop.startswith("'"):
+                                    target_prop = escape_sql_param(target_prop)
+
+                            # 比较
+                            if base_prop != target_prop:
+                                # 同义处理
+                                for same_prop_value in COLUMN_SAME_PROP_VALUES:
+                                    if base_prop in same_prop_value and target_prop in same_prop_value:
+                                        break
+
+                                else:
+                                    col_diff['columnChanges'][prop] = {
+                                        'base'  : base_prop,
+                                        'target': target_prop,
+                                    }
 
                         if col_diff['columnChanges']:
                             diff['changedColumns'][column_name] = col_diff
